@@ -1,0 +1,83 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body {
+      width: 320px;
+      font-family: 'Segoe UI', system-ui, sans-serif;
+      background: #1a1a2e;
+      color: #e0e0e0;
+      padding: 16px;
+    }
+    h1 {
+      font-size: 16px;
+      color: #0f0;
+      margin-bottom: 4px;
+      font-family: monospace;
+    }
+    .version {
+      font-size: 11px;
+      color: #666;
+      margin-bottom: 16px;
+      font-family: monospace;
+    }
+    #status {
+      font-family: monospace;
+      font-size: 12px;
+      color: #0f0;
+      background: #0d0d1a;
+      border: 1px solid #333;
+      border-radius: 4px;
+      padding: 10px;
+      margin-bottom: 16px;
+      min-height: 40px;
+      word-wrap: break-word;
+    }
+    button {
+      width: 100%;
+      padding: 10px;
+      font-size: 14px;
+      font-weight: 600;
+      border: none;
+      border-radius: 4px;
+      cursor: pointer;
+      transition: background 0.2s;
+    }
+    #startBtn {
+      background: #0071dc;
+      color: white;
+    }
+    #startBtn:hover { background: #005bb5; }
+    #startBtn:disabled {
+      background: #333;
+      color: #666;
+      cursor: not-allowed;
+    }
+    .info {
+      margin-top: 12px;
+      font-size: 11px;
+      color: #888;
+      line-height: 1.5;
+    }
+    .info code {
+      color: #0f0;
+      background: #0d0d1a;
+      padding: 1px 4px;
+      border-radius: 2px;
+    }
+  </style>
+</head>
+<body>
+  <h1>Walmart Order Scraper</h1>
+  <div class="version">v3.1 — Chrome Extension</div>
+  <div id="status">Ready. Navigate to walmart.com/orders and click Start.</div>
+  <button id="startBtn">Start Scraping</button>
+  <div class="info">
+    Extracts <code>in-store</code> orders to CSV.<br>
+    Paginates through all orders, then visits each detail page.
+  </div>
+  <script src="popup.js"></script>
+</body>
+</html>
