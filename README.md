@@ -4,6 +4,8 @@ A Chrome extension that exports your Walmart purchase history to CSV.
 
 Walmart doesn't offer a way to export your order history, so this extension scrapes it for you. It paginates through all your orders (in-store, delivery, and pickup), visits each order detail page, and downloads a CSV with every item, price, quantity, and store location.
 
+![Demo](getorders.gif)
+
 ## Install
 
 1. Download or clone this repo
