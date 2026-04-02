@@ -80,10 +80,6 @@
         if (seenIds.has(id)) return;
         seenIds.add(id);
 
-        const isStore = !!document.querySelector(
-          `a[href*="/orders/${id}/returns?orderSource=STORE"]`
-        );
-
         let orderDate = '';
         let orderTotal = '';
 
@@ -108,8 +104,7 @@
 
         orders.push({
           id,
-          isStore,
-          detailUrl: `https://www.walmart.com/orders/${id}?groupId=0&storePurchase=true`,
+          detailUrl: `https://www.walmart.com/orders/${id}`,
           orderDate,
           orderTotal,
         });
@@ -192,23 +187,18 @@
       await sleep(1500);
 
       const visible = extractVisibleOrders();
-      let newStore = 0;
-      let newDelivery = 0;
+      let newCount = 0;
 
       visible.forEach((o) => {
         if (!allIds.has(o.id)) {
           allIds.add(o.id);
-          if (o.isStore) {
-            allOrders.push(o);
-            newStore++;
-          } else {
-            newDelivery++;
-          }
+          allOrders.push(o);
+          newCount++;
         }
       });
 
       showStatus(
-        `Page ${page}: +${newStore} store orders, skipped ${newDelivery} delivery (${allOrders.length} total)`
+        `Page ${page}: +${newCount} orders (${allOrders.length} total)`
       );
 
       if (page >= CONFIG.maxPages) break;
@@ -216,7 +206,7 @@
       const hasMore = await clickNextAndWait(allIds);
       if (!hasMore) {
         showStatus(
-          `Last page reached (${page}). ${allOrders.length} store orders total.`
+          `Last page reached (${page}). ${allOrders.length} orders total.`
         );
         break;
       }
@@ -259,8 +249,8 @@
 
       let quantity = 1;
       let weight = '';
-      const qtyMatch = ctx.match(/ShoppedQty\s+(\d+)/);
-      const wtMatch = ctx.match(/ShoppedWt\s+([\d.]+)\s*lb/);
+      const qtyMatch = ctx.match(/(?:ShoppedQty|Qty)\s+(\d+)/);
+      const wtMatch = ctx.match(/(?:ShoppedWt|Weight[- ]adjusted)\s*([\d.]+)\s*lb/);
       if (qtyMatch) {
         quantity = parseInt(qtyMatch[1]);
       } else if (wtMatch) {
@@ -379,7 +369,7 @@
       return;
     }
 
-    showStatus('Walmart Store Order Scraper v3.1 — Collecting order IDs...');
+    showStatus('Walmart Order Scraper v3.1 — Collecting order IDs...');
     const found = await waitForSelector(
       '[data-automation-id*="view-order-details-link-"]'
     );
@@ -390,13 +380,13 @@
 
     const allOrders = await collectAllOrders();
     if (allOrders.length === 0) {
-      showStatus('No store orders found.');
+      showStatus('No orders found.');
       clearState();
       return;
     }
 
     showStatus(
-      `${allOrders.length} store orders found. Starting detail extraction...`
+      `${allOrders.length} orders found. Starting detail extraction...`
     );
     await sleep(2000);
 
@@ -471,7 +461,7 @@
       );
 
       const csv = convertToCSV(updatedData);
-      const filename = `walmart_store_orders_${new Date().toISOString().split('T')[0]}.csv`;
+      const filename = `walmart_orders_${new Date().toISOString().split('T')[0]}.csv`;
       downloadCSV(csv, filename);
 
       window.allOrderData = updatedData;

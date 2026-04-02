@@ -1,8 +1,8 @@
 # Get Walmart Purchase History
 
-A Chrome extension that exports your Walmart in-store purchase history to CSV.
+A Chrome extension that exports your Walmart purchase history to CSV.
 
-Walmart doesn't offer a way to export your order history, so this extension scrapes it for you. It paginates through your orders, visits each order detail page, and downloads a CSV with every item, price, quantity, and store location.
+Walmart doesn't offer a way to export your order history, so this extension scrapes it for you. It paginates through all your orders (in-store, delivery, and pickup), visits each order detail page, and downloads a CSV with every item, price, quantity, and store location.
 
 ## Install
 
@@ -19,13 +19,13 @@ Walmart doesn't offer a way to export your order history, so this extension scra
 3. Click **Start Scraping**
 4. Wait for it to finish -- it automatically downloads a CSV when done
 
-The extension paginates through all your orders, filters for in-store purchases, then visits each order detail page to extract item-level data. A status banner at the top of the page shows progress.
+The extension paginates through all your orders, then visits each order detail page to extract item-level data. A status banner at the top of the page shows progress.
 
 If the page reloads mid-scrape (e.g. navigating between order details), the extension auto-resumes from where it left off using session storage.
 
 ## CSV Output
 
-The downloaded file is named `walmart_store_orders_YYYY-MM-DD.csv` with these columns:
+The downloaded file is named `walmart_orders_YYYY-MM-DD.csv` with these columns:
 
 | Column | Description |
 |---|---|
@@ -49,7 +49,6 @@ Order-level fields (Subtotal through Timestamp) only appear on the first item ro
 
 ## Limitations
 
-- Only exports **in-store** orders (delivery/pickup orders are skipped)
 - Walmart's page structure may change, which could break the scraper
 - Processes up to 50 pages of order history (~500 orders)
 - Each order detail page takes a few seconds to load and parse
