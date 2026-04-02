@@ -67,11 +67,69 @@
     chrome.runtime.sendMessage({ type: 'status', message: msg }).catch(() => {});
   }
 
+  // ─── Extract groupId from page data ───
+
+  function getGroupIdMap() {
+    const map = {};
+    try {
+      // Walmart uses Next.js — check __NEXT_DATA__ for order/group mappings
+      const nextData = document.getElementById('__NEXT_DATA__');
+      if (nextData) {
+        const text = nextData.textContent;
+        // Match orderId + groupId pairs in the JSON (they appear near each other)
+        const orderPattern = /"orderId"\s*:\s*"(\d+)"/g;
+        const groupPattern = /"groupId"\s*:\s*"([a-f0-9]+)"/g;
+        let m;
+        while ((m = orderPattern.exec(text))) {
+          map[m[1]] = null; // placeholder
+        }
+        // Try to find groupId near each orderId
+        for (const orderId of Object.keys(map)) {
+          // Look for groupId within ~500 chars of the orderId mention
+          const idx = text.indexOf(`"${orderId}"`);
+          if (idx === -1) continue;
+          const chunk = text.substring(Math.max(0, idx - 500), idx + 500);
+          const gm = chunk.match(/"groupId"\s*:\s*"([a-f0-9]+)"/);
+          if (gm) map[orderId] = gm[1];
+        }
+      }
+    } catch (e) {
+      console.log('[WMT Scraper] Could not parse __NEXT_DATA__:', e);
+    }
+
+    // Also scan all script tags for order/group ID patterns
+    if (Object.values(map).every((v) => v === null)) {
+      try {
+        const scripts = document.querySelectorAll('script:not([src])');
+        for (const script of scripts) {
+          const text = script.textContent;
+          if (!text.includes('orderId') && !text.includes('groupId')) continue;
+          // Look for patterns like {"orderId":"123","groupId":"abc"}
+          const pairs = text.matchAll(/"orderId"\s*:\s*"(\d+)"[^}]{0,200}"groupId"\s*:\s*"([a-f0-9]+)"/g);
+          for (const p of pairs) {
+            map[p[1]] = p[2];
+          }
+          // Try reverse order: groupId before orderId
+          const pairs2 = text.matchAll(/"groupId"\s*:\s*"([a-f0-9]+)"[^}]{0,200}"orderId"\s*:\s*"(\d+)"/g);
+          for (const p of pairs2) {
+            map[p[2]] = p[1];
+          }
+        }
+      } catch (e) {
+        console.log('[WMT Scraper] Script scan error:', e);
+      }
+    }
+
+    return map;
+  }
+
   // ─── Extract order IDs currently visible ───
 
   function extractVisibleOrders() {
     const orders = [];
     const seenIds = new Set();
+    const groupIdMap = getGroupIdMap();
+    console.log('[WMT Scraper] GroupId map:', groupIdMap);
     document
       .querySelectorAll('[data-automation-id*="view-order-details-link-"]')
       .forEach((btn) => {
@@ -103,40 +161,19 @@
           if (m) orderTotal = m[0];
         }
 
-        // Build the correct detail URL
-        // Store orders use ?groupId=0&storePurchase=true
-        // Delivery orders use ?groupId=<hash> (extracted from links in the card)
-        let detailUrl = '';
-
-        // First check for any link in the card that points to this order's detail page
-        const allLinks = card.querySelectorAll('a[href*="/orders/"]');
-        for (const link of allLinks) {
-          const href = link.getAttribute('href') || '';
-          if (href.includes(`/orders/${id}`) && !href.includes('/returns') && href.includes('groupId')) {
-            detailUrl = href.startsWith('http') ? href : `https://www.walmart.com${href}`;
-            break;
-          }
-        }
-
-        if (!detailUrl) {
-          // Fall back: detect order type from return link
-          const isStore = !!document.querySelector(
-            `a[href*="/orders/${id}/returns?orderSource=STORE"]`
-          );
-          if (isStore) {
-            detailUrl = `https://www.walmart.com/orders/${id}?groupId=0&storePurchase=true`;
-          } else {
-            // For delivery orders, try to extract groupId from any link in the card
-            let groupId = '';
-            for (const link of allLinks) {
-              const href = link.getAttribute('href') || '';
-              const gm = href.match(/groupId=([a-f0-9]+)/);
-              if (gm) { groupId = gm[1]; break; }
-            }
-            detailUrl = groupId
-              ? `https://www.walmart.com/orders/${id}?groupId=${groupId}`
-              : `https://www.walmart.com/orders/${id}?groupId=0&storePurchase=true`;
-          }
+        // Build the correct detail URL using groupId from page data
+        const isStore = !!document.querySelector(
+          `a[href*="/orders/${id}/returns?orderSource=STORE"]`
+        );
+        let detailUrl;
+        if (isStore) {
+          detailUrl = `https://www.walmart.com/orders/${id}?groupId=0&storePurchase=true`;
+        } else if (groupIdMap[id]) {
+          detailUrl = `https://www.walmart.com/orders/${id}?groupId=${groupIdMap[id]}`;
+        } else {
+          // Last resort: try bare URL (may 404 for some delivery orders)
+          detailUrl = `https://www.walmart.com/orders/${id}`;
+          console.log(`[WMT Scraper] No groupId found for order ${id}, URL may fail`);
         }
 
         orders.push({
