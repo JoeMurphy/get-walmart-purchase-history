@@ -545,6 +545,11 @@
       startScraping(msg.maxOrders || 0);
       sendResponse({ ok: true });
     }
+    if (msg.type === 'stop_scraping') {
+      clearState();
+      showStatus('Stopped.');
+      sendResponse({ ok: true });
+    }
     if (msg.type === 'get_status') {
       const state = getState();
       sendResponse({

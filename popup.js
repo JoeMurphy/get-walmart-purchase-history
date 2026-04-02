@@ -1,5 +1,6 @@
 const statusEl = document.getElementById('status');
 const startBtn = document.getElementById('startBtn');
+const stopBtn = document.getElementById('stopBtn');
 const limitBtns = document.querySelectorAll('.order-limit .options button');
 
 let selectedLimit = 50;
@@ -21,24 +22,39 @@ limitBtns.forEach((btn) => {
 async function checkState() {
   try {
     const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
-    if (!tab || !tab.url || !tab.url.includes('walmart.com/orders')) {
+    if (!tab || !tab.url || !tab.url.includes('walmart.com')) {
       setStatus('Navigate to walmart.com/orders first.');
       startBtn.disabled = true;
+      stopBtn.style.display = 'none';
       return;
     }
 
-    const response = await chrome.tabs.sendMessage(tab.id, { type: 'get_status' });
-    if (response && response.running) {
-      setStatus(`Scraping in progress... ${response.progress || ''}`);
-      startBtn.disabled = true;
-      startBtn.textContent = 'Scraping...';
-    } else {
+    try {
+      const response = await chrome.tabs.sendMessage(tab.id, { type: 'get_status' });
+      if (response && response.running) {
+        setStatus(`Scraping in progress... ${response.progress || ''}`);
+        startBtn.disabled = true;
+        startBtn.textContent = 'Scraping...';
+        stopBtn.style.display = 'block';
+        return;
+      }
+    } catch (e) {
+      // Content script not loaded on this page — that's OK
+    }
+
+    // Not running — enable start if on orders page
+    if (tab.url.includes('walmart.com/orders')) {
       startBtn.disabled = false;
+      stopBtn.style.display = 'none';
+    } else {
+      setStatus('Navigate to walmart.com/orders first.');
+      startBtn.disabled = true;
+      stopBtn.style.display = 'none';
     }
   } catch (e) {
-    // Content script might not be loaded yet
     setStatus('Navigate to walmart.com/orders first.');
     startBtn.disabled = true;
+    stopBtn.style.display = 'none';
   }
 }
 
@@ -49,6 +65,7 @@ startBtn.addEventListener('click', async () => {
 
     startBtn.disabled = true;
     startBtn.textContent = 'Scraping...';
+    stopBtn.style.display = 'block';
     setStatus('Starting...');
 
     await chrome.tabs.sendMessage(tab.id, {
@@ -59,6 +76,25 @@ startBtn.addEventListener('click', async () => {
     setStatus('Error: Could not connect. Refresh the Walmart orders page.');
     startBtn.disabled = false;
     startBtn.textContent = 'Start Scraping';
+    stopBtn.style.display = 'none';
+  }
+});
+
+stopBtn.addEventListener('click', async () => {
+  try {
+    const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
+    if (!tab) return;
+
+    await chrome.tabs.sendMessage(tab.id, { type: 'stop_scraping' });
+    setStatus('Stopped. Navigate to walmart.com/orders to start again.');
+    startBtn.disabled = false;
+    startBtn.textContent = 'Start Scraping';
+    stopBtn.style.display = 'none';
+  } catch (e) {
+    setStatus('Stopped.');
+    startBtn.disabled = false;
+    startBtn.textContent = 'Start Scraping';
+    stopBtn.style.display = 'none';
   }
 });
 
