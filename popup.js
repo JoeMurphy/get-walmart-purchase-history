@@ -1,9 +1,21 @@
 const statusEl = document.getElementById('status');
 const startBtn = document.getElementById('startBtn');
+const limitBtns = document.querySelectorAll('.order-limit .options button');
+
+let selectedLimit = 50;
 
 function setStatus(msg) {
   statusEl.textContent = msg;
 }
+
+// Order limit selection
+limitBtns.forEach((btn) => {
+  btn.addEventListener('click', () => {
+    limitBtns.forEach((b) => b.classList.remove('selected'));
+    btn.classList.add('selected');
+    selectedLimit = parseInt(btn.dataset.limit);
+  });
+});
 
 // Check if we're on the right page and if scraping is already running
 async function checkState() {
@@ -39,7 +51,10 @@ startBtn.addEventListener('click', async () => {
     startBtn.textContent = 'Scraping...';
     setStatus('Starting...');
 
-    await chrome.tabs.sendMessage(tab.id, { type: 'start_scraping' });
+    await chrome.tabs.sendMessage(tab.id, {
+      type: 'start_scraping',
+      maxOrders: selectedLimit,
+    });
   } catch (e) {
     setStatus('Error: Could not connect. Refresh the Walmart orders page.');
     startBtn.disabled = false;

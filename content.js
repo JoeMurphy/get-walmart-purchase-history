@@ -5,6 +5,7 @@
   'use strict';
 
   const CONFIG = {
+    maxOrders: 50,
     maxPages: 50,
     maxWaitTime: 15000,
   };
@@ -102,9 +103,45 @@
           if (m) orderTotal = m[0];
         }
 
+        // Build the correct detail URL
+        // Store orders use ?groupId=0&storePurchase=true
+        // Delivery orders use ?groupId=<hash> (extracted from links in the card)
+        let detailUrl = '';
+
+        // First check for any link in the card that points to this order's detail page
+        const allLinks = card.querySelectorAll('a[href*="/orders/"]');
+        for (const link of allLinks) {
+          const href = link.getAttribute('href') || '';
+          if (href.includes(`/orders/${id}`) && !href.includes('/returns') && href.includes('groupId')) {
+            detailUrl = href.startsWith('http') ? href : `https://www.walmart.com${href}`;
+            break;
+          }
+        }
+
+        if (!detailUrl) {
+          // Fall back: detect order type from return link
+          const isStore = !!document.querySelector(
+            `a[href*="/orders/${id}/returns?orderSource=STORE"]`
+          );
+          if (isStore) {
+            detailUrl = `https://www.walmart.com/orders/${id}?groupId=0&storePurchase=true`;
+          } else {
+            // For delivery orders, try to extract groupId from any link in the card
+            let groupId = '';
+            for (const link of allLinks) {
+              const href = link.getAttribute('href') || '';
+              const gm = href.match(/groupId=([a-f0-9]+)/);
+              if (gm) { groupId = gm[1]; break; }
+            }
+            detailUrl = groupId
+              ? `https://www.walmart.com/orders/${id}?groupId=${groupId}`
+              : `https://www.walmart.com/orders/${id}?groupId=0&storePurchase=true`;
+          }
+        }
+
         orders.push({
           id,
-          detailUrl: `https://www.walmart.com/orders/${id}`,
+          detailUrl,
           orderDate,
           orderTotal,
         });
@@ -190,7 +227,7 @@
       let newCount = 0;
 
       visible.forEach((o) => {
-        if (!allIds.has(o.id)) {
+        if (!allIds.has(o.id) && allOrders.length < CONFIG.maxOrders) {
           allIds.add(o.id);
           allOrders.push(o);
           newCount++;
@@ -200,6 +237,13 @@
       showStatus(
         `Page ${page}: +${newCount} orders (${allOrders.length} total)`
       );
+
+      if (allOrders.length >= CONFIG.maxOrders) {
+        showStatus(
+          `Reached ${CONFIG.maxOrders} order limit. ${allOrders.length} orders collected.`
+        );
+        break;
+      }
 
       if (page >= CONFIG.maxPages) break;
 
@@ -359,7 +403,14 @@
   // MESSAGE HANDLER — triggered by popup or auto-resume
   // ═══════════════════════════════════════════
 
-  async function startScraping() {
+  async function startScraping(maxOrders) {
+    // 0 means unlimited
+    if (maxOrders) {
+      CONFIG.maxOrders = maxOrders;
+    } else {
+      CONFIG.maxOrders = Infinity;
+    }
+
     const currentUrl = window.location.href;
     const isOrderListPage =
       currentUrl.includes('/orders') && !currentUrl.match(/\/orders\/\d+/);
@@ -369,7 +420,8 @@
       return;
     }
 
-    showStatus('Walmart Order Scraper v3.1 — Collecting order IDs...');
+    const limitLabel = CONFIG.maxOrders === Infinity ? 'all' : `up to ${CONFIG.maxOrders}`;
+    showStatus(`Walmart Order Scraper v3.2 — Collecting ${limitLabel} orders...`);
     const found = await waitForSelector(
       '[data-automation-id*="view-order-details-link-"]'
     );
@@ -490,7 +542,7 @@
   // ─── Listen for start message from popup ───
   chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
     if (msg.type === 'start_scraping') {
-      startScraping();
+      startScraping(msg.maxOrders || 0);
       sendResponse({ ok: true });
     }
     if (msg.type === 'get_status') {
